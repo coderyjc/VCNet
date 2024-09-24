@@ -74,6 +74,7 @@ class ClassBlock(nn.Module):
         else:
             x = self.classifier(x)
             return x
+
 #最后一阶段的感知聚合模块
 class three_aware(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, M=3, r=16, L=32):
@@ -87,7 +88,7 @@ class three_aware(nn.Module):
         采用分组卷积： groups = 32,所以输入channel的数值必须是group的整数倍
         '''
         super().__init__()
-        d = max(in_channels // r, L)  # 计算从向量C降维到 向量Z 的长度d
+        d = max(in_channels // r, L)  # 计算从向量C降维到 向量 Z 的长度d
         self.M = M
         self.out_channels = out_channels
         self.global_pool = nn.AdaptiveAvgPool2d(output_size=1)  # 自适应pool到指定维度    这里指定为1，实现 GAP
@@ -126,6 +127,7 @@ class three_aware(nn.Module):
                    V)  # 两个加权后的特征 逐元素相加  [batch_size,out_channels,H,W] + [batch_size,out_channels,H,W] = [batch_size,out_channels,H,W]
         x = V.view(V.size(0), V.size(1))
         return x, V  # [batch_size,out_channels,H,W]
+
 #也是感知聚合模块，实验的时候为了验证不同的模型对实验的效果
 class three_select(nn.Module):
     def __init__(self, class_num=124):
@@ -152,6 +154,7 @@ class three_select(nn.Module):
         f = (bb + f) / 2
         x = self.classifier(f)
         return x, f
+
 #感知车辆前面的特征，与论文中的模块结构不同，后面可自行调整
 class qian_aware(nn.Module):
     def __init__(self, channel=512):
@@ -177,6 +180,7 @@ class qian_aware(nn.Module):
         #f = (qian + f) / 2
         x = self.classifier(f)
         return x, f
+
 #感知车辆后面的特征，与论文中的模块结构不同，后面可自行调整
 class hou_aware(nn.Module):
     def __init__(self, channel=512):
@@ -202,6 +206,7 @@ class hou_aware(nn.Module):
         #f = (hou + f) / 2
         x = self.classifier(f)
         return x, f
+
 #感知车辆侧面的特征，与论文中的模块结构不同，后面可自行调整
 class ce_aware(nn.Module):
     def __init__(self, channel=512):
@@ -229,12 +234,16 @@ class ce_aware(nn.Module):
         return x, f
 
 #backbone网络
-class ft_net(nn.Module):
+"""
+viewpoint feature branch
 
+forward返回 x = viewpoint feature
+"""
+class ft_net(nn.Module):
     def __init__(self, class_num=751, droprate=0.5, stride=2, circle=False, ibn=False):
         super(ft_net, self).__init__()
         model_ft = models.resnet50(pretrained=True)
-        if ibn==True:
+        if ibn == True:
             model_ft = torch.hub.load('XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
         # avg pooling to global pooling
         if stride == 1:
@@ -259,7 +268,11 @@ class ft_net(nn.Module):
         x = self.classifier(x)
         return x
 
-#到此为止后面的模型可以不用看了，是我之前做实验的模型
+"""
+appearance feature branch
+
+forward返回 x = appearance features
+"""
 # Define the ResNet50-based Model
 class ft_net_ours(nn.Module):
 
@@ -276,6 +289,9 @@ class ft_net_ours(nn.Module):
         self.model = model_ft
         self.circle = circle
         self.classifier = ClassBlock(2048, class_num, droprate, return_f=circle)
+        """
+        反卷积函数 -- 视角编码器 -- Encoder
+        """
         self.proj0 = nn.ConvTranspose2d(2, 3, 16, 16, bias=False)
         self.proj1 = nn.ConvTranspose2d(2, 64, 4, 4, bias=False)
         self.proj2 = nn.ConvTranspose2d(2, 256, 4, 4, bias=False)
@@ -283,8 +299,8 @@ class ft_net_ours(nn.Module):
         self.proj4 = nn.ConvTranspose2d(2, 1024, 1, 1, bias=False)
 
     def forward(self, x, vf):
-        b, c = vf.size()
-        vf = vf.view(b, 2, 16, 16)
+        b, c = vf.size() # batchsize, channel
+        vf = vf.view(b, 2, 16, 16) # expand the view features
         vf0 = self.proj0(vf)  # b, 3, 256, 256
         x = torch.add(x, vf0)
 
@@ -314,6 +330,15 @@ class ft_net_ours(nn.Module):
         x = x.view(x.size(0), x.size(1))
         x = self.classifier(x)
         return x
+
+"""
+######################################################
+# 
+# 后续为实验模型。
+# 
+######################################################
+"""
+
 
 class BaseVAE(nn.Module):
 
@@ -1010,7 +1035,6 @@ class Autoencoder(nn.Module):
         x_hat = self.decoder(latent)
         return x_hat, latent
 
-
 class Prediction(nn.Module):
     """Dual prediction module that projects features from corresponding latent space."""
 
@@ -1179,6 +1203,8 @@ class ft_net_beifen(nn.Module):
         else:
             x = self.classifier(x)
         return x
+
+
 # Define the ResNet50  Model with angle loss
 # The code is borrowed from https://github.com/clcarwin/sphereface_pytorch
 class ft_net_angle(nn.Module):
@@ -1336,6 +1362,7 @@ class ft_net_EF6(nn.Module):
         x = self.classifier(x)
 
         return x
+
 # Define the NAS-based Model
 class ft_net_NAS(nn.Module):
 
@@ -1544,6 +1571,7 @@ class PCB(nn.Module):
         for i in range(self.part):
             y.append(predict[i])
         return y
+
 
 class PCB_test(nn.Module):
     def __init__(self,model):

@@ -236,11 +236,11 @@ def load_network(network):
 def fliplr(img):
     '''flip horizontal'''
     inv_idx = torch.arange(img.size(3)-1,-1,-1).long()  # N x C x H x W
-    img_flip = img.index_select(3,inv_idx)
+    img_flip = img.index_select(3, inv_idx)
     return img_flip
 
 
-def extract_feature(model,model_view,dataloaders):
+def extract_feature(model, model_view, dataloaders):
     features = torch.FloatTensor()
     features_view = torch.FloatTensor()
     count = 0

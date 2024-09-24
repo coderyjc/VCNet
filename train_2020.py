@@ -30,7 +30,7 @@ from samplers import RandomIdentitySampler
 version =  torch.__version__
 import numpy as np
 from circle_loss import CircleLoss, convert_label_to_similarity
-np.set_printoptions(threshold=np.inf)
+np.set_printoptions(shold=np.inf)
 
 #fp16
 try:
@@ -43,6 +43,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 if not os.path.isdir('../mqveri/outputs'):
     os.mkdir('../mqveri/outputs')
 ######################################################################
+
+
 # Options
 # --------
 parser = argparse.ArgumentParser(description='Training')
@@ -51,6 +53,7 @@ parser.add_argument('--adam', action='store_true', help='use all training data' 
 parser.add_argument('--name',default='ft_ResNet50', type=str, help='output model name')
 parser.add_argument('--init_name',default='imagenet', type=str, help='initial with ImageNet')
 parser.add_argument('--data_dir',default='../mqveri',type=str, help='training dir path')
+
 parser.add_argument('--train_all', action='store_true', help='use all training data' )
 parser.add_argument('--train_veri', action='store_true', help='use part training data + veri' )
 parser.add_argument('--train_virtual', action='store_true', help='use part training data + virtual' )
@@ -58,6 +61,7 @@ parser.add_argument('--train_comp', action='store_true', help='use part training
 parser.add_argument('--train_pku', action='store_true', help='use part training data + pku' )
 parser.add_argument('--train_comp_veri', action='store_true', help='use part training data + comp +veri' )
 parser.add_argument('--train_milktea', action='store_true', help='use part training data + com + veri+pku' )
+
 parser.add_argument('--color_jitter', action='store_true', help='use color jitter in training' )
 parser.add_argument('--batchsize', default=32, type=int, help='batchsize') #在多卡训练时，保证分给多卡后还能被3除尽
 parser.add_argument('--inputsize', default=256, type=int, help='batchsize')
@@ -117,8 +121,11 @@ if len(opt.gpu_ids)>0:
 ######################################################################
 # Load Data
 # ---------
-#
 
+
+"""
+数据增强
+"""
 if opt.h == opt.w:
     transform_train_list = [
         transforms.Resize((opt.inputsize, opt.inputsize), interpolation=3),
@@ -153,7 +160,9 @@ else:
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]
 
-
+"""
+PCB: 使用双三次插值调整图像大小为 384,192
+"""
 if opt.PCB:
     transform_train_list = [
         transforms.Resize((384,192), interpolation=3),
@@ -167,22 +176,33 @@ if opt.PCB:
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]
 
-if opt.erasing_p>0:
+"""
+随机擦除
+"""
+if opt.erasing_p > 0:
     transform_train_list = transform_train_list +  [RandomErasing(probability = opt.erasing_p, mean=[0.0, 0.0, 0.0])]
 
+"""
+亮度增强
+"""
 if opt.color_jitter:
     transform_train_list = [transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0)] + transform_train_list
 
-
+"""
+图像增强
+"""
 transform_train_list_aug = [ImageNetPolicy()] + transform_train_list
 
 print(transform_train_list)
+
+"""
+数据增强规则
+"""
 data_transforms = {
-    'train': transforms.Compose( transform_train_list ),
+    'train': transforms.Compose(transform_train_list),
     'train_aug': transforms.Compose( transform_train_list_aug ), 
     'val': transforms.Compose(transform_val_list),
 }
-
 
 train_all = ''
 if opt.train_all:
@@ -208,6 +228,12 @@ if opt.train_milktea:
 
 image_datasets = {}
 
+"""
+加载数据
+"""
+# 如果没有自动增强，则直接调用data_transforms['train']中的增强方法
+# 如果自动增强     则调用AugFolder方法，使用train 的方法和train_aug的增强方法, 这个方法的步骤是，分别同一批图像进行两种形式的增强，
+#                在本文中，调用的两种增强方式分别是 train 和 train_aug, 每一批图像分别经过这两种方式的增强之后，以三元组的形式返回。
 if not opt.autoaug:
     image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train' + train_all),
                                           data_transforms['train'])
@@ -215,17 +241,19 @@ else:
     image_datasets['train'] = AugFolder(os.path.join(data_dir, 'train' + train_all),
                                           data_transforms['train'], data_transforms['train_aug'])
 
+"""
+是否平衡采样样本
+"""
 if opt.balance:
     dataset_train = image_datasets['train']
-    weights = make_weights_for_balanced_classes(dataset_train.imgs, len(dataset_train.classes))                                                                
-    weights = torch.DoubleTensor(weights)   
+    weights = make_weights_for_balanced_classes(dataset_train.imgs, len(dataset_train.classes))
+    weights = torch.DoubleTensor(weights)
     sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
     dataloaders = {}
-    dataloaders['train'] = torch.utils.data.DataLoader(image_datasets['train'], batch_size=opt.batchsize, sampler=sampler, num_workers=8, pin_memory=True) # 8 workers may work faster
+    dataloaders['train'] = torch.utils.data.DataLoader(image_datasets['train'], batch_size=opt.batchsize, sampler=sampler, num_workers=8, pin_memory=True)
 else: 
-    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
-                                             shuffle=True, num_workers=8, pin_memory=True) # 8 workers may work faster
-                                             for x in ['train']}
+    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize, shuffle=True, num_workers=8, pin_memory=True) 
+                   for x in ['train']}
 
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train']}
 class_names = image_datasets['train'].classes
@@ -258,10 +286,10 @@ y_err['val'] = []
 def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=0, num_epochs=25):
     since = time.time()
 
-    warm_up = 0.1 # We start from the 0.1*lrRate
-    gamma = 0.0 #auto_aug
-    warm_iteration = round(dataset_sizes['train']/opt.batchsize)*opt.warm_epoch # first 5 epoch
-    total_iteration = round(dataset_sizes['train']/opt.batchsize)*num_epochs
+    warm_up = 0.1 # We start from the 0.1 * lrRate
+    gamma = 0.0 # auto_aug
+    warm_iteration = round(dataset_sizes['train'] / opt.batchsize) * opt.warm_epoch # first 5 epoch
+    total_iteration = round(dataset_sizes['train'] / opt.batchsize) * num_epochs
 
     best_model_wts = model.state_dict()
     best_loss = 9999
@@ -270,14 +298,15 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
     if opt.circle:
         criterion_circle = CircleLoss(m=0.25, gamma=32) # gamma = 64 may lead to a better result.
 
-    for epoch in range(num_epochs-start_epoch):
+    for epoch in range(num_epochs - start_epoch):
         epoch = epoch + start_epoch
-        print('gamma: %.4f'%gamma)
+        print('gamma: %.4f' % gamma)
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
         # Each epoch has a training and validation phase
         for phase in ['train']:
+            # 设置模型训练状态
             if phase == 'train':
                 scheduler.step()
                 model.train(True)  # Set model to training mode
@@ -286,9 +315,12 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
 
             running_loss = 0.0
             running_corrects = 0.0
-            # Iterate over data.
+            # 迭代数据
             for data in dataloaders[phase]:
-                # get the inputs
+                """
+                # 获取输入
+                # 在使用增强数据的时候, 不会100%完全使用增强的数据, 而是以gamma的概率使用, 当大于gamma的时候才使用增强后的数据。
+                """
                 if opt.autoaug:
                     inputs, inputs2, labels = data
                     if random.uniform(0, 1)> gamma:
@@ -296,9 +328,10 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                     gamma = min(1.0, gamma + 1.0 / total_iteration)
                 else:
                     inputs, labels = data
+
                 #pdb.set_trace()
-                now_batch_size,c,h,w = inputs.shape
-                if now_batch_size<opt.batchsize: # skip the last batch
+                now_batch_size, c, h, w = inputs.shape
+                if now_batch_size < opt.batchsize: # skip the last batch
                     continue
                 #print(inputs.shape)
                 # wrap them in Variable
@@ -319,15 +352,31 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                     with torch.no_grad():
                         outputs = model(inputs)
                 else:
+                    """
+                    【VCC模块】
+                    如果不是验证阶段的话                   
+                    需要先用model_view模型对图像进行一个xxx特征的提取; 然后再把原始图像和提取出来的这个f一起输入model模型
+                    
+                    model_view(VCC-viewpoint feature branch): ft_net() 看名字应该是个backbone
+                    
+                    model(VCC-apperance feature branch): ft_net_xxxxxx() 后续处理。
+                    """
                     f = model_view(inputs)
                     #outputs = model(inputs, y1, y2, y3, y4)
-                    outputs = model(inputs,f)
+                    outputs = model(inputs, f)
 
+                """
+                【VAF模块】
+                下面是根据不同的设置计算不同的loss和preds
+                
+                part[i] 和 output[i], 是如何对应起来的？？？
+
+                """
                 if opt.circle:
                     logits, ff = outputs
                     fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
                     ff = ff.div(fnorm.expand_as(ff))
-                    loss = criterion(logits, labels) + criterion_circle(*convert_label_to_similarity( ff, labels))/now_batch_size
+                    loss = criterion(logits, labels) + criterion_circle(*convert_label_to_similarity(ff, labels)) / now_batch_size
                     _, preds = torch.max(logits.data, 1)
                 elif opt.PCB:
                     part = {}
@@ -336,7 +385,7 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                     for i in range(num_part):
                         part[i] = outputs[i]
 
-                    score = sm(part[0]) + sm(part[1]) +sm(part[2]) + sm(part[3]) +sm(part[4]) +sm(part[5])
+                    score = sm(part[0]) + sm(part[1]) + sm(part[2]) + sm(part[3]) + sm(part[4]) + sm(part[5])
                     _, preds = torch.max(score.data, 1)
 
                     loss = criterion(part[0], labels)
@@ -361,12 +410,16 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                         outputs = outputs[0]
                     _, preds = torch.max(outputs.data, 1)
 
-                # backward + optimize only if in training phase
-                if epoch<opt.warm_epoch and phase == 'train': 
+                """
+                预热和学习率调度
+                """
+                if epoch < opt.warm_epoch and phase == 'train': 
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
                     loss *= warm_up
 
-                # backward + optimize only if in training phase
+                """
+                反向传播
+                """
                 if phase == 'train':
                     if fp16: # we use optimier to backward loss
                         with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -375,16 +428,18 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                         loss.backward()
                     optimizer.step()
 
-                #print('Iteration: loss:%.2f accuracy:%.2f'%(loss.item(), float(torch.sum(preds == labels.data))/now_batch_size ) )
+                # 计算loss
+                # print('Iteration: loss:%.2f accuracy:%.2f'%(loss.item(), float(torch.sum(preds == labels.data))/now_batch_size ) )
                 # statistics
-                if int(version[0])>0 or int(version[2]) > 3: # for the new version like 0.4.0, 0.5.0 and 1.0.0
+                if int(version[0]) > 0 or int(version[2]) > 3: # for the new version like 0.4.0, 0.5.0 and 1.0.0
                     running_loss += loss.item() * now_batch_size
                 else :  # for the old version like 0.3.0 and 0.3.1
                     running_loss += loss.data[0] * now_batch_size
                 running_corrects += float(torch.sum(preds == labels.data))
                 
                 del(loss, outputs, inputs, preds)
-
+            
+            # 计算epoch的loss和acc and  print
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects / dataset_sizes[phase]
             
@@ -446,6 +501,9 @@ def draw_curve(current_epoch):
 # Load a pretrainied model and reset final fully connected layer.
 #
 
+"""
+实验的时候只走最后一个分支， ours
+"""
 if not opt.resume:
     opt.nclasses = len(class_names)
     if opt.use_dense:
@@ -495,10 +553,10 @@ if opt.init_name != 'imagenet':
 #Put model parameter in front of the optimizer!!!
 
 # For resume:
-if start_epoch>=60:
-    opt.lr = opt.lr*0.1
-if start_epoch>=75:
-    opt.lr = opt.lr*0.1
+if start_epoch >= 60:
+    opt.lr = opt.lr * 0.1
+if start_epoch >= 75:
+    opt.lr = opt.lr * 0.1
 
 if len(opt.gpu_ids)>1:
     model = torch.nn.DataParallel(model, device_ids=opt.gpu_ids).cuda()
@@ -554,6 +612,13 @@ if opt.adam:
 #exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=40, gamma=0.1)
 exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[60, 75], gamma=0.1)
 
+
+
+"""
+model_view : viewpoint feature branch
+属于VCC模块，这个玩意提取出来E1，E2，E3和E4，然后传入appperance feature branch
+
+"""
 model_view = ft_net(3, droprate=0, stride=1, circle = False, ibn=False)
 view_path = os.path.join('../mqveri/outputs', "viewagain", "net_last.pth")
 # Change to test mode
@@ -563,12 +628,14 @@ model_view.classifier.classifier = nn.Sequential()
 model_view = model_view.cuda()
 #model_view = model_view.module
 model_view = model_view.eval()
+
+
 ######################################################################
 # Train and evaluate
 # ^^^^^^^^^^^^^^^^^^
 #
 # It should take around 1-2 hours on GPU. 
-#
+
 dir_name = os.path.join('../mqveri/outputs',name)
 
 if not opt.resume:

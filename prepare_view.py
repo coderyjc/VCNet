@@ -102,8 +102,6 @@ for root, dirs, files in os.walk(gallery_path, topdown=True):
         copyfile(src_path, dst_path + '/' + name)
 
 
-
-
 #---------------------------------------
 #train_val
 train_path = download_path + '/image_train'

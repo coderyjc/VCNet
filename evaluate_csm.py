@@ -4,12 +4,16 @@ import numpy as np
 import pdb
 import copy
 import sys
+
 np.set_printoptions(threshold=sys.maxsize)
+
 #import time
 import os
 import pickle
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
 #######################################################################
+
 # Evaluate
 def evaluate(score,ql,qc,gl,gc):
     #print(score.shape)
