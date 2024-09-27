@@ -368,9 +368,7 @@ def train_model(model, model_view, criterion, optimizer, scheduler, start_epoch=
                 """
                 【VAF模块】
                 下面是根据不同的设置计算不同的loss和preds
-                
                 part[i] 和 output[i], 是如何对应起来的？？？
-
                 """
                 if opt.circle:
                     logits, ff = outputs
@@ -617,8 +615,7 @@ exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[60, 75], g
 """
 model_view : viewpoint feature branch
 属于VCC模块，这个玩意提取出来E1，E2，E3和E4，然后传入appperance feature branch
-
-"""
+""" 
 model_view = ft_net(3, droprate=0, stride=1, circle = False, ibn=False)
 view_path = os.path.join('../mqveri/outputs', "viewagain", "net_last.pth")
 # Change to test mode
@@ -633,7 +630,7 @@ model_view = model_view.eval()
 ######################################################################
 # Train and evaluate
 # ^^^^^^^^^^^^^^^^^^
-#
+# 
 # It should take around 1-2 hours on GPU. 
 
 dir_name = os.path.join('../mqveri/outputs',name)

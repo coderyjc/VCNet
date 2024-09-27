@@ -148,7 +148,7 @@ if 'use_IR' in config_view: # compatible with early config
     opt_view.use_IR = config_view['use_IR']
 else:
     opt_view.use_IR = False
-
+  
 
 if 'arc' in config_view:
     opt_view.arc = config_view['arc']
