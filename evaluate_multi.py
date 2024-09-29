@@ -14,6 +14,7 @@ np.set_printoptions(threshold=sys.maxsize)
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 #######################################################################
+
 def softmax(x):
     x = x.astype(float)
     if x.ndim == 1:

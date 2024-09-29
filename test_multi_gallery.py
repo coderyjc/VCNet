@@ -190,7 +190,7 @@ def load_network(network):
 # ----------------------
 #
 # Extract feature from  a trained model.
-#
+
 def fliplr(img):
     '''flip horizontal'''
     inv_idx = torch.arange(img.size(3) - 1, -1, -1).long()  # N x C x H x W

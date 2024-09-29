@@ -24,6 +24,8 @@ from tqdm import tqdm
 import pdb
 
 
+
+
 # fp16
 try:
     from apex.fp16_utils import *
@@ -72,8 +74,8 @@ opt.angle = config['angle']
 opt.use_EF4 = config['use_EF4']
 opt.use_EF5 = config['use_EF5']
 opt.use_EF6 = config['use_EF6']
-opt.ibn = config['ibn']
 if 'h' in config:
+    opt.ibn = config['ibn']
     opt.h = config['h']
     opt.w = config['w']
 

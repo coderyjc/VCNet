@@ -1,15 +1,16 @@
-"""
-修改了所有路径concat的方式。
-从原来的只支持Linux改成了更加健壮的两个系统都支持的方式。
-"""
-
 import os
 from shutil import copyfile
 import pdb
 import io
 
+"""
+创建视角相关的数据集
+"""
+
+
 # 776的基础路径
 veri776_path = "E:\\dataset\\VeRi776"
+
 
 path = './keypoint_test.txt'
 if not os.path.isdir(veri776_path):
@@ -20,7 +21,8 @@ if not os.path.isdir(save_path):
     os.makedirs(save_path)
 
 #---------------------------------------
-#train_all
+# train_all
+# 这段代码的目的是将测试集中的图像根据视角信息重新组织到新的目录结构中，以便于后续的视角相关的车辆重识别任务。
 
 f2 = io.open(path, 'r', encoding= 'UTF-8')
 train_path = os.path.join(veri776_path, 'image_test')
@@ -33,7 +35,7 @@ for i in f2:
     label = i.split('/')[-1][0:4]  #0190
     view = i[-2]  #6
     #../veri/image_train/0190_c014_00051260_1.jpg
-    src_path = os.path.join(train_path, filename)  
+    src_path = os.path.join(train_path, filename)
     if not os.path.exists(src_path):
         continue
     #../veri/view/test/0190
@@ -61,7 +63,7 @@ for root, dirs, files in os.walk(train_path, topdown=True):
 #query
 
 query_path = os.path.join(veri776_path, 'image_query')
-query_save_path = os.path.join(veri776_path, 'pytorch' + 'query')
+query_save_path = os.path.join(veri776_path, 'pytorch', 'query')
 
 if not os.path.isdir(query_save_path):
     os.makedirs(query_save_path)
@@ -103,7 +105,7 @@ if os.path.isdir(query_path):
 #gallery
 
 gallery_path = os.path.join(veri776_path, 'image_test')
-gallery_save_path = os.path.join(veri776_path, 'pytorch' + 'gallery')
+gallery_save_path = os.path.join(veri776_path, 'pytorch', 'gallery')
 
 if not os.path.isdir(gallery_save_path):
     os.makedirs(gallery_save_path)
@@ -119,13 +121,12 @@ for root, dirs, files in os.walk(gallery_path, topdown=True):
             os.makedirs(dst_path)
         copyfile(src_path, os.path.join(dst_path, name))
 
-
 #---------------------------------------
 #train_val
 
 train_path = os.path.join(veri776_path, 'image_train')
-train_save_path = os.path.join(veri776_path, 'pytorch' + 'train')
-val_save_path = os.path.join(veri776_path, 'pytorch' + 'val')
+train_save_path = os.path.join(veri776_path, 'pytorch', 'train')
+val_save_path = os.path.join(veri776_path, 'pytorch', 'val')
 
 if not os.path.isdir(train_save_path):
     os.makedirs(train_save_path)
